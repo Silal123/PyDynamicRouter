@@ -1,0 +1,2 @@
+This is a test file at / of the server.
+All files in this directory are provided!
