@@ -4,6 +4,7 @@ import inspect
 import asyncio
 from pathlib import Path
 from aiohttp import web
+import logging
 
 class DynamicRouter:
     def __init__(self, base_dir, routes_dir="routes", static_dir="static"):
@@ -11,6 +12,7 @@ class DynamicRouter:
         self.routes_dir = self.base_dir / routes_dir
         self.static_dir = self.base_dir / static_dir
         self.app = web.Application()
+        self.logger = logging.getLogger('DynamicRouter')
 
     def setup_static_files(self, url_prefix="/"):
         if self.static_dir.exists() and self.static_dir.is_dir():
@@ -28,9 +30,6 @@ class DynamicRouter:
                     url_parts.append(part)
 
             url = '/' + '/'.join(url_parts) if url_parts else '/'
-
-            if path.is_file() and not url.endswith('/'):
-                url = url.split('/', 1)[0] or '/'
 
             if path.is_file():
                 if path.name == '+server.py':
@@ -58,7 +57,11 @@ class DynamicRouter:
         for name, func in inspect.getmembers(module, inspect.isfunction):
             for method_name, decorator in http_methods.items():
                 if hasattr(func, '_http_method') and func._http_method == method_name:
-                    self.app.router.add_route(method_name, url, func)
+                    try:
+                        self.app.router.add_route(method_name, url, func)
+                        self.logger.debug(f'✅ Added routes from {module_name} at {url}')
+                    except RuntimeError as e:
+                        self.logger.debug(f"⚠️  Route conflict at {method_name} {url}: {e}; {module_name} at {url}")
         
     def _register_html_page(self, page_path, url):
         async def serve_html(request):
